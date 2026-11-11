@@ -1,0 +1,12 @@
+{
+  "id": "rackbox",
+  "title": "Containers",
+  "icon": "box",
+  "version": "0.1.0",
+  "description": "Docker images without a daemon – RackBox",
+  "page": "page.js",
+  "exec": ["/usr/bin/rackbox"],
+  "read": ["ls", "images", "apps", "logs"],
+  "write": ["start", "stop", "restart", "rm", "rmi"],
+  "jobs": ["install", "create", "pull"]
+}

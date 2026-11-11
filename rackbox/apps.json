@@ -1,0 +1,72 @@
+[
+  {
+    "id": "nginx",
+    "name": "Web server",
+    "image": "nginx",
+    "icon": "net",
+    "desc": "nginx serves the files in a folder on your NAS as a website.",
+    "web": ":8080/",
+    "memory": "64M",
+    "binds": [
+      "{data}/html:/usr/share/nginx/html"
+    ],
+    "setup": "sed -i 's/listen  *80;/listen 8080;/; s/listen  *\\[::\\]:80;/listen [::]:8080;/' /etc/nginx/conf.d/default.conf",
+    "note": "Put your website into {data}/html."
+  },
+  {
+    "id": "nextcloud",
+    "name": "Nextcloud",
+    "image": "nextcloud",
+    "icon": "share",
+    "desc": "Your own cloud: files, calendar and contacts with apps for phone and desktop.",
+    "web": ":8081/",
+    "memory": "400M",
+    "binds": [
+      "{data}:/var/www/html"
+    ],
+    "env": {
+      "NEXTCLOUD_TRUSTED_DOMAINS": "{host}",
+      "PHP_MEMORY_LIMIT": "256M"
+    },
+    "setup": "sed -i 's/^Listen 80$/Listen 8081/' /etc/apache2/ports.conf && sed -i 's/<VirtualHost \\*:80>/<VirtualHost *:8081>/' /etc/apache2/sites-available/000-default.conf",
+    "note": "The first start copies Nextcloud into {data} and takes several minutes on slow hardware. Then open the web page and create the admin account (SQLite is fine for a few users)."
+  },
+  {
+    "id": "postgres",
+    "name": "PostgreSQL",
+    "image": "postgres",
+    "icon": "disk",
+    "desc": "Database server for your own apps (port 5432).",
+    "memory": "256M",
+    "binds": [
+      "{data}:/var/lib/postgresql/data"
+    ],
+    "ask": [
+      {
+        "key": "POSTGRES_PASSWORD",
+        "label": "Password for the postgres user",
+        "secret": true
+      }
+    ],
+    "note": "Connect with user postgres on port 5432."
+  },
+  {
+    "id": "redis",
+    "name": "Redis",
+    "image": "redis",
+    "icon": "layers",
+    "desc": "Fast in-memory key-value store and cache (port 6379, local connections only).",
+    "memory": "64M",
+    "binds": [
+      "{data}:/data"
+    ],
+    "note": "Protected mode: only programs on the NAS itself can connect.",
+    "cmd": [
+      "redis-server",
+      "--bind",
+      "127.0.0.1",
+      "--protected-mode",
+      "yes"
+    ]
+  }
+]

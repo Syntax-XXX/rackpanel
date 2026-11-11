@@ -18,12 +18,12 @@ import (
 var version = "dev" // set at build time via -ldflags "-X main.version=…"
 
 var (
-	listen  = flag.String("listen", ":80", "Adresse, z. B. :80 oder 0.0.0.0:8080")
+	listen  = flag.String("listen", ":80", "listen address, e.g. :80 or 0.0.0.0:8080")
 	wwwDir  = flag.String("www", "/usr/share/rackpanel/www", "web UI directory")
 	dataDir = flag.String("data", "/var/lib/rackpanel", "state directory (panel users, settings)")
 	roots   = flag.String("roots", "", "folders for the file manager, comma separated (empty = detect)")
 	setUser = flag.String("set-user", "", "create panel user / set password (password on stdin) and exit")
-	showVer = flag.Bool("version", false, "Version ausgeben")
+	showVer = flag.Bool("version", false, "print the version")
 )
 
 type result struct {
@@ -106,6 +106,7 @@ func main() {
 	registerAdmin(mux, store)
 	registerSystem(mux, store)
 	registerApps(mux, store)
+	registerAddons(mux, store)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { fail(w, 404, 404, "unknown") })
 
 	fs := http.FileServer(http.Dir(*wwwDir))

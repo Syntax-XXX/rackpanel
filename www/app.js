@@ -13,6 +13,7 @@ const store = {
 // ── Icons (line style) ──
 const P = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+  box: '<path d="M21 7.5 12 3 3 7.5v9L12 21l9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
   home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
   disk: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="12" cy="12" r="4"/><path d="M12 12h.01"/>',
   folder: '<path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2.5h6.5A2.5 2.5 0 0 1 21 9v8.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>',
@@ -194,7 +195,7 @@ function gaugeSVG(p, color = 'url(#gg)') {
 function setGauge(el, p) { const c = 2 * Math.PI * 46; $('[data-arc]', el).setAttribute('stroke-dashoffset', c * (1 - Math.min(100, p) / 100)); }
 
 // ── Pages ──
-const pages = [
+const basePages = [
   { id: 'overview', title: 'Overview', icon: 'home', render: pageOverview },
   { id: 'storage', title: 'Storage', icon: 'disk', render: pageStorage },
   { id: 'files', title: 'Files', icon: 'folder', render: pageFiles },
@@ -207,10 +208,41 @@ const pages = [
   { id: 'logs', title: 'Logs', icon: 'logs', render: pageLogs },
   { id: 'system', title: 'System', icon: 'sliders', render: pageSystem },
 ];
+let pages = basePages;
 let cleanup = null;
 let hostInfo = { hostname: '' };
 
-function shell() {
+// ── Add-ons: /usr/share/rackpanel/addons/<id>/page.js calls RackPanel.addon(id, render) ──
+const RackPanel = (window.RackPanel = { addons: {}, addon(id, render) { this.addons[id] = render; } });
+function addonCtx(a) {
+  const run = (args) => api('POST', `addons/${a.id}/run`, { args });
+  return {
+    api, toast, fail, modal, confirmDlg, promptDlg, esc, ic, fmtBytes, fmtDate, setSub, reload: () => route(), host: () => hostInfo,
+    read: (...args) => api('GET', `addons/${a.id}/run?` + args.map((x) => 'a=' + encodeURIComponent(x)).join('&')).then((r) => r.output),
+    run: (...args) => run(args).then((r) => r.output),
+    job: (title, ...args) => run(args).then((r) => new Promise((res) => (r.job ? runJob(r.job, title, res) : res(true)))),
+  };
+}
+async function pageAddon(a, v) {
+  if (!RackPanel.addons[a.id]) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = `/addons/${encodeURIComponent(a.id)}/${a.page || 'page.js'}?v=${encodeURIComponent(a.version || '')}`;
+      s.onload = res; s.onerror = () => rej(new Error(`Add-on “${a.title}” could not be loaded`));
+      document.head.append(s);
+    });
+  }
+  const render = RackPanel.addons[a.id];
+  if (!render) throw new Error(`Add-on “${a.title}” did not register`);
+  setSub(a.description || '');
+  return render(v, addonCtx(a));
+}
+
+async function shell() {
+  const addons = await api('GET', 'addons').catch(() => []);
+  const ap = addons.map((a) => ({ id: 'x-' + a.id, title: a.title, icon: P[a.icon] ? a.icon : 'grid', render: (v) => pageAddon(a, v) }));
+  const at = basePages.findIndex((p) => p.id === 'network');
+  pages = [...basePages.slice(0, at), ...ap, ...basePages.slice(at)];
   $('#root').innerHTML = `<div class="app">
     <aside class="side glass">
       <div class="brand"><span class="brand-mark">${ic('server')}</span><div>RackPanel<small>NAS management</small></div></div>
