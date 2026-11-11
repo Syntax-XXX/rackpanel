@@ -25,13 +25,8 @@ var mdLine = regexp.MustCompile(`^(md\d+)\s*:\s*(\S+)\s+(?:\(\S+\)\s+)?(\S+)\s+(
 
 func mdstat() []raidInfo {
 	mounts := map[string]string{}
-	if b, err := os.ReadFile("/proc/mounts"); err == nil {
-		for _, l := range strings.Split(string(b), "\n") {
-			p := strings.Fields(l)
-			if len(p) >= 2 && strings.HasPrefix(p[0], "/dev/md") {
-				mounts[strings.TrimPrefix(p[0], "/dev/")] = p[1]
-			}
-		}
+	for _, v := range volumes() {
+		mounts[strings.TrimPrefix(v.Dev, "/dev/")] = v.Path
 	}
 	if b, err := os.ReadFile("/proc/swaps"); err == nil {
 		for _, l := range strings.Split(string(b), "\n") {
