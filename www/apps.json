@@ -1,0 +1,27 @@
+[
+  {
+    "id": "transmission", "name": "Transmission", "icon": "download",
+    "desc": "Download-Manager für BitTorrent mit Weboberfläche. Lädt direkt auf das NAS.",
+    "packages": ["transmission-daemon"], "service": "transmission-daemon.service", "port": 9091, "path": "/transmission/web/",
+    "note": "Anmeldung: transmission / transmission – bitte in /etc/transmission-daemon/settings.json ändern (Dienst vorher stoppen).",
+    "setup": "systemctl stop transmission-daemon; sed -i 's/\"rpc-whitelist-enabled\": true/\"rpc-whitelist-enabled\": false/' /etc/transmission-daemon/settings.json; systemctl start transmission-daemon"
+  },
+  {
+    "id": "minidlna", "name": "MiniDLNA", "icon": "film",
+    "desc": "Medienserver: Filme, Musik und Fotos erscheinen auf Fernsehern und Konsolen im Netzwerk.",
+    "packages": ["minidlna"], "service": "minidlna.service", "port": 8200, "path": "/",
+    "note": "Medienordner in /etc/minidlna.conf eintragen (media_dir=/volume1/…), danach den Dienst neu starten."
+  },
+  {
+    "id": "mosquitto", "name": "Mosquitto", "icon": "share",
+    "desc": "MQTT-Broker für Smart-Home-Geräte und Sensoren (Port 1883).",
+    "packages": ["mosquitto", "mosquitto-clients"], "service": "mosquitto.service",
+    "note": "Hört ab Werk nur lokal. Für das Netzwerk in /etc/mosquitto/conf.d/ einen listener 1883 eintragen."
+  },
+  {
+    "id": "vsftpd", "name": "FTP-Server", "icon": "upload",
+    "desc": "Dateizugriff per FTP für Scanner, Kameras und ältere Geräte (Port 21).",
+    "packages": ["vsftpd"], "service": "vsftpd.service",
+    "note": "Anmeldung mit den Benutzern des NAS. Schreiben erlauben: write_enable=YES in /etc/vsftpd.conf."
+  }
+]
