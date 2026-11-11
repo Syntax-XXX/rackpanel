@@ -10,7 +10,7 @@
     "service": "filebrowser.service",
     "port": 8085,
     "path": "/",
-    "note": "The admin password is printed in the installation output. Its root folder is set in /etc/default/filebrowser."
+    "note": "Sign in as admin – the first password is in the installation output and in /var/lib/filebrowser/initial-password. Its root folder is set in /etc/default/filebrowser."
   },
   {
     "id": "transmission",
