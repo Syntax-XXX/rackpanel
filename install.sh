@@ -33,7 +33,8 @@ main() {
 
   local user="${RACKPANEL_USER:-admin}" pass="${RACKPANEL_PASSWORD:-}" port="${RACKPANEL_PORT:-80}" extras="${RACKPANEL_EXTRAS:-}"
   local ui=1
-  if [ -n "${RACKPANEL_YES:-}" ] || ! [ -r /dev/tty ]; then ui=0; fi
+  # -r reicht nicht: ohne steuerndes Terminal (cron, ssh ohne -t) lässt sich /dev/tty trotzdem nicht öffnen
+  if [ -n "${RACKPANEL_YES:-}" ] || ! { : </dev/tty; } 2>/dev/null; then ui=0; fi
 
   export DEBIAN_FRONTEND=noninteractive
   local need=()
