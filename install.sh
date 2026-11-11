@@ -85,8 +85,11 @@ main() {
   if [ -n "${RACKPANEL_TARBALL:-}" ]; then
     cp "$RACKPANEL_TARBALL" "$tmp/rp.tar.gz"
   else
-    echo "Lade RackPanel ($arch) …"
-    curl -fL --retry 3 -o "$tmp/rp.tar.gz" "https://github.com/$REPO/releases/latest/download/rackpanel-linux-$arch.tar.gz" || die "Download fehlgeschlagen."
+    # Version über die API: die /latest/-Weiterleitung hinkt nach einem Release ein paar Minuten hinterher
+    local tag; tag=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
+    [ -n "$tag" ] || die "Konnte die aktuelle Version nicht ermitteln (GitHub erreichbar?)."
+    echo "Lade RackPanel $tag ($arch) …"
+    curl -fsSL --retry 3 -o "$tmp/rp.tar.gz" "https://github.com/$REPO/releases/download/$tag/rackpanel-linux-$arch.tar.gz" || die "Download fehlgeschlagen."
   fi
   tar -xzf "$tmp/rp.tar.gz" -C "$tmp"
   [ -x "$tmp/rackpanel" ] && [ -f "$tmp/www/index.html" ] || die "Archiv unvollständig."
