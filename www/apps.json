@@ -1,27 +1,65 @@
 [
   {
-    "id": "transmission", "name": "Transmission", "icon": "download",
+    "id": "filebrowser",
+    "name": "File Browser",
+    "icon": "folder",
+    "desc": "Fast web file manager: browse, upload, edit and share files with links. From the RSRB repository.",
+    "packages": [
+      "filebrowser"
+    ],
+    "service": "filebrowser.service",
+    "port": 8085,
+    "path": "/",
+    "note": "The admin password is printed in the installation output. Its root folder is set in /etc/default/filebrowser."
+  },
+  {
+    "id": "transmission",
+    "name": "Transmission",
+    "icon": "download",
     "desc": "BitTorrent download manager with a web UI. Downloads straight to the NAS.",
-    "packages": ["transmission-daemon"], "service": "transmission-daemon.service", "port": 9091, "path": "/transmission/web/",
+    "packages": [
+      "transmission-daemon"
+    ],
+    "service": "transmission-daemon.service",
+    "port": 9091,
+    "path": "/transmission/web/",
     "note": "Login: transmission / transmission – change it in /etc/transmission-daemon/settings.json (stop the service first).",
     "setup": "systemctl stop transmission-daemon; sed -i 's/\"rpc-whitelist-enabled\": true/\"rpc-whitelist-enabled\": false/' /etc/transmission-daemon/settings.json; systemctl start transmission-daemon"
   },
   {
-    "id": "minidlna", "name": "MiniDLNA", "icon": "film",
+    "id": "minidlna",
+    "name": "MiniDLNA",
+    "icon": "film",
     "desc": "Media server: movies, music and photos show up on TVs and consoles on your network.",
-    "packages": ["minidlna"], "service": "minidlna.service", "port": 8200, "path": "/",
+    "packages": [
+      "minidlna"
+    ],
+    "service": "minidlna.service",
+    "port": 8200,
+    "path": "/",
     "note": "Add your media folders to /etc/minidlna.conf (media_dir=/volume1/…), then restart the service."
   },
   {
-    "id": "mosquitto", "name": "Mosquitto", "icon": "share",
+    "id": "mosquitto",
+    "name": "Mosquitto",
+    "icon": "share",
     "desc": "MQTT broker for smart home devices and sensors (port 1883).",
-    "packages": ["mosquitto", "mosquitto-clients"], "service": "mosquitto.service",
+    "packages": [
+      "mosquitto",
+      "mosquitto-clients"
+    ],
+    "service": "mosquitto.service",
     "note": "Listens on localhost only by default. For the network add a 'listener 1883' in /etc/mosquitto/conf.d/."
   },
   {
-    "id": "vsftpd", "name": "FTP server", "icon": "upload",
+    "id": "vsftpd",
+    "name": "FTP server",
+    "icon": "upload",
     "desc": "File access over FTP for scanners, cameras and older devices (port 21).",
-    "packages": ["vsftpd"], "service": "vsftpd.service",
+    "packages": [
+      "vsftpd"
+    ],
+    "service": "vsftpd.service",
     "note": "Sign in with the NAS users. To allow uploads set write_enable=YES in /etc/vsftpd.conf."
   }
 ]

@@ -2,7 +2,7 @@
   "id": "rackbox",
   "title": "Containers",
   "icon": "box",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Docker images without a daemon – RackBox",
   "page": "page.js",
   "exec": ["/usr/bin/rackbox"],
