@@ -1,22 +1,24 @@
 # RackPanel API
 
-Alles, was die Oberfläche kann, geht auch per HTTP. Damit lässt sich das NAS in eigene Dashboards einbauen.
+**English** · [Deutsch](API.de.md)
 
-## Schlüssel holen
+Everything the web UI does is plain HTTP, so you can put your NAS into your own dashboard.
 
-Im Panel: **System → API-Schlüssel → Neuer Schlüssel**. „Nur lesen“ reicht für Dashboards und kann nichts verändern.
-Der Schlüssel (`rp_…`) wird nur einmal angezeigt.
+## Get a key
 
-## Aufruf
+In the panel: **System → API keys → New key**. "Read only" is enough for dashboards and can't change anything.
+The key (`rp_…`) is shown only once.
 
-Schlüssel als Header `X-API-Key` (oder `Authorization: Bearer rp_…`, oder `?token=rp_…`) mitschicken:
+## Calling it
+
+Send the key as header `X-API-Key` (or `Authorization: Bearer rp_…`, or `?token=rp_…`):
 
 ```sh
 curl -H "X-API-Key: rp_…" http://nas/api/overview
 ```
 
-Jede Antwort hat dieselbe Form: `{"success": 200, "message": "ok", "data": …}`. Bei Fehlern steht der Grund in `message`.
-CORS ist offen, der Aufruf geht also auch direkt aus dem Browser:
+Every response has the same shape: `{"success": 200, "message": "ok", "data": …}`. On errors `message` says why.
+CORS is open, so it also works directly from a browser:
 
 ```html
 <div id="nas"></div>
@@ -30,31 +32,31 @@ fetch('http://nas/api/overview', { headers: { 'X-API-Key': 'rp_…' } })
 </script>
 ```
 
-Ein Nur-Lese-Schlüssel im Browser ist für jeden sichtbar, der die Seite öffnen kann – also nur in Dashboards im eigenen Netz verwenden.
+A read-only key inside a web page is visible to anyone who can open that page – only use it in dashboards on your own network.
 
-## Die wichtigsten Adressen
+## Main endpoints
 
-| Methode | Pfad | Liefert |
+| Method | Path | Returns |
 |---|---|---|
-| GET | `/api/overview` | Name, Modell, System, Laufzeit, Last, Temperaturen, Lüfter, Laufwerke, Volumes, RAID, Netzwerk, Speicher |
-| GET | `/api/stats` | Momentaufnahme: CPU %, Arbeitsspeicher, Netzwerk-Durchsatz, Last (für Live-Anzeigen, z. B. alle 3 s) |
-| GET | `/api/storage` | Laufwerke (SMART), RAID-Gruppen, Volumes |
-| GET | `/api/storage/smart/{dev}` | SMART-Bericht eines Laufwerks, z. B. `sda` |
-| GET | `/api/services` | Dienste mit Zustand |
-| GET | `/api/apps` | App-Katalog mit „installiert“ und „läuft“ |
-| GET | `/api/files?path=/volume1` | Ordnerinhalt |
-| GET | `/api/network` | Adressen, Route, DNS |
-| GET | `/api/logs?unit=ssh.service` | Journal |
+| GET | `/api/overview` | name, model, OS, uptime, load, temperatures, fan, drives, volumes, RAID, network, memory |
+| GET | `/api/stats` | snapshot: CPU %, memory, network counters, load (for live views, e.g. every 3 s) |
+| GET | `/api/storage` | drives (SMART), RAID arrays, volumes |
+| GET | `/api/storage/smart/{dev}` | SMART report of one drive, e.g. `sda` |
+| GET | `/api/services` | services and their state |
+| GET | `/api/apps` | app catalog with "installed" and "running" |
+| GET | `/api/files?path=/volume1` | folder listing |
+| GET | `/api/network` | addresses, routes, DNS |
+| GET | `/api/logs?unit=ssh.service` | journal |
 
-Mit einem Schlüssel mit vollem Zugriff zusätzlich (Auswahl):
+With a full-access key, additionally (selection):
 
-| Methode | Pfad | Wirkung |
+| Method | Path | Effect |
 |---|---|---|
-| POST | `/api/services/{name}/{start\|stop\|restart\|enable\|disable}` | Dienst steuern |
-| POST | `/api/apps/{id}/{install\|remove}` | App installieren/entfernen, liefert eine Job-ID |
-| GET | `/api/jobs/{id}` | Fortschritt und Ausgabe eines Jobs |
-| POST | `/api/storage/{dev}/sleep` | Laufwerk schlafen legen |
-| POST | `/api/updates/check`, `/api/updates/install` | Systemupdates |
-| POST | `/api/power/{reboot\|poweroff}` | Neustart, Herunterfahren |
+| POST | `/api/services/{name}/{start\|stop\|restart\|enable\|disable}` | control a service |
+| POST | `/api/apps/{id}/{install\|remove}` | install/remove an app, returns a job ID |
+| GET | `/api/jobs/{id}` | progress and output of a job |
+| POST | `/api/storage/{dev}/sleep` | spin a drive down |
+| POST | `/api/updates/check`, `/api/updates/install` | system updates |
+| POST | `/api/power/{reboot\|poweroff}` | restart, shut down |
 
-Schlüssel verwalten und das Panel-Passwort ändern geht nur mit Anmeldung, nie mit einem Schlüssel.
+Managing keys and changing the panel password require signing in – never possible with a key.

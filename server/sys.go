@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// ── Messwerte aus /proc ──────────────────────────────────────────────────────
+// ── Readings from /proc ──
 
 var cpuPrev struct {
 	sync.Mutex
@@ -22,7 +22,7 @@ var cpuPrev struct {
 	percent     float64
 }
 
-// cpuSample: Auslastung seit dem letzten Aufruf (wird vom Sammler alle 3 s aufgerufen)
+// cpuSample: load since the previous call (the collector calls it every 3 s)
 func cpuSample() float64 {
 	b, err := os.ReadFile("/proc/stat")
 	if err != nil {
@@ -99,7 +99,7 @@ func netStats() []netStat {
 	return out
 }
 
-// volumes: alle eingehängten Block-Dateisysteme (/, /volumeN, /mnt/… ) – Größe/Belegung in Bytes
+// volumes: all mounted block filesystems (/, /volumeN, /mnt/…) – size/usage in bytes
 type volume struct {
 	Path  string `json:"path"`
 	Dev   string `json:"dev"`
@@ -124,7 +124,7 @@ func volumes() []volume {
 			continue
 		}
 		seen[p[0]] = true
-		if p[0] == "/dev/root" { // Kernel ohne initrd meldet root so; echtes Gerät steht in der Kommandozeile
+		if p[0] == "/dev/root" { // kernels without initrd report root like this; the real device is on the command line
 			c, _ := os.ReadFile("/proc/cmdline")
 			for _, f := range strings.Fields(string(c)) {
 				if strings.HasPrefix(f, "root=/dev/") {
@@ -138,7 +138,7 @@ func volumes() []volume {
 	return out
 }
 
-// detectRoots: Bereiche für den Datei-Manager – alle Daten-Volumes außer /, dazu /home, /srv, /mnt, /media
+// detectRoots: file manager areas – all data volumes except /, plus /home, /srv, /mnt, /media
 func detectRoots() []string {
 	var r []string
 	for _, v := range volumes() {
@@ -160,7 +160,7 @@ func detectRoots() []string {
 	return r
 }
 
-// ── Platten: SMART (ohne schlafende Platten zu wecken), alle 60 s aufgefrischt ──
+// ── Disks: SMART (without waking sleeping disks), refreshed every 60 s ──
 type diskInfo struct {
 	Name     string `json:"name"`
 	Path     string `json:"path"`
@@ -200,13 +200,13 @@ func readDisks() []diskInfo {
 			s, _ := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
 			d.Size = s * 512
 		}
-		if d.Size == 0 { // leerer Kartenleser
+		if d.Size == 0 { // empty card reader
 			continue
 		}
 		if b, err := os.ReadFile("/sys/block/" + n + "/device/model"); err == nil {
 			d.Model = strings.TrimSpace(string(b))
 		}
-		// -n standby: schlafende Platte nicht aufwecken (Exit-Code 2)
+		// -n standby: don't wake a sleeping disk (exit code 2)
 		cmd := exec.Command("smartctl", "-n", "standby", "-j", "-H", "-i", "-A", d.Path)
 		raw, err := cmd.Output()
 		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode()&2 != 0 && len(raw) < 200 {
@@ -334,13 +334,13 @@ func loadAvg() string {
 }
 
 func registerSys(mux *http.ServeMux, s *storeT) {
-	go func() { // CPU-Messung im Hintergrund, damit die Prozentwerte stimmen
+	go func() { // sample CPU in the background so percentages are accurate
 		for {
 			cpuSample()
 			time.Sleep(3 * time.Second)
 		}
 	}()
-	// Live-Werte (alle 3 s abgefragt)
+	// live values (polled every 3 s)
 	mux.HandleFunc("GET /api/stats", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		ok(w, map[string]any{"cpu": cpuPrev.percent, "mem": memInfo(), "net": netStats(), "load": loadAvg(), "uptime": uptimeSeconds(), "time": time.Now().Unix()})
 	}))
@@ -363,7 +363,7 @@ func osName() string {
 	return "Linux"
 }
 
-// model: Gerätename aus Device Tree (ARM) oder DMI (PC)
+// model: device name from the device tree (ARM) or DMI (PC)
 func model() string {
 	for _, f := range []string{"/proc/device-tree/model", "/sys/class/dmi/id/product_name"} {
 		if b, err := os.ReadFile(f); err == nil && len(b) > 0 {

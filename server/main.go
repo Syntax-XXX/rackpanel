@@ -1,5 +1,5 @@
-// RackPanel: schlankes NAS-Verwaltungspanel für Debian (Go-Backend + statische Oberfläche).
-// Antworten haben die Form {success, message, data}.
+// RackPanel: lightweight NAS management panel for Debian (Go backend + static web UI).
+// Responses look like {success, message, data}.
 package main
 
 import (
@@ -15,14 +15,14 @@ import (
 	"time"
 )
 
-var version = "dev" // beim Bauen per -ldflags "-X main.version=…" gesetzt
+var version = "dev" // set at build time via -ldflags "-X main.version=…"
 
 var (
 	listen  = flag.String("listen", ":80", "Adresse, z. B. :80 oder 0.0.0.0:8080")
-	wwwDir  = flag.String("www", "/usr/share/rackpanel/www", "Ordner der Oberfläche")
-	dataDir = flag.String("data", "/var/lib/rackpanel", "Zustand (Panel-Benutzer, Einstellungen)")
-	roots   = flag.String("roots", "", "Ordner für den Datei-Manager, kommagetrennt (leer = automatisch)")
-	setUser = flag.String("set-user", "", "Panel-Benutzer anlegen/Passwort setzen (Passwort über stdin) und beenden")
+	wwwDir  = flag.String("www", "/usr/share/rackpanel/www", "web UI directory")
+	dataDir = flag.String("data", "/var/lib/rackpanel", "state directory (panel users, settings)")
+	roots   = flag.String("roots", "", "folders for the file manager, comma separated (empty = detect)")
+	setUser = flag.String("set-user", "", "create panel user / set password (password on stdin) and exit")
 	showVer = flag.Bool("version", false, "Version ausgeben")
 )
 
@@ -49,8 +49,8 @@ func readJSON(r *http.Request, v any) error {
 	return json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20)).Decode(v)
 }
 
-// cors: fremde Dashboards dürfen die API mit einem Schlüssel aus dem Browser abfragen.
-// Anmeldung bleibt ausgenommen, damit keine fremde Seite Passwörter durchprobieren kann.
+// cors: other dashboards may call the API with a key from the browser.
+// Login stays excluded so no foreign page can brute-force passwords.
 func cors(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
@@ -81,10 +81,10 @@ func main() {
 	if *setUser != "" {
 		pw, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err := store.setUser(*setUser, strings.TrimRight(pw, "\r\n")); err != nil {
-			fmt.Fprintln(os.Stderr, "Fehler:", err)
+			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
-		fmt.Println("Panel-Benutzer gesetzt:", *setUser)
+		fmt.Println("panel user set:", *setUser)
 		return
 	}
 	if *roots != "" {
@@ -106,7 +106,7 @@ func main() {
 	registerAdmin(mux, store)
 	registerSystem(mux, store)
 	registerApps(mux, store)
-	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { fail(w, 404, 404, "unbekannt") })
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { fail(w, 404, 404, "unknown") })
 
 	fs := http.FileServer(http.Dir(*wwwDir))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

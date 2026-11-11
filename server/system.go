@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// ── Systembenutzer (für SMB/NFS/SSH), Gruppen, SMB-Freigaben, Netzwerk, Hostname, Zeit ──
+// ── System users (for SMB/NFS/SSH), groups, SMB shares, network, hostname, time ──
 
 var (
 	sysUserRe = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
@@ -18,7 +18,7 @@ var (
 	zoneRe    = regexp.MustCompile(`^[A-Za-z0-9_+/-]{1,64}$`)
 )
 
-// runIn: Befehl mit Eingabe auf stdin (Passwörter nie als Argument, sonst stehen sie in ps)
+// runIn: command with stdin input (never pass passwords as arguments, they would show up in ps)
 func runIn(stdin string, name string, args ...string) (string, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Stdin = strings.NewReader(stdin)
@@ -52,7 +52,7 @@ func smbUsers() map[string]bool {
 }
 
 func groupMembers() map[string][]string {
-	m := map[string][]string{} // Benutzer → Gruppen
+	m := map[string][]string{} // user → groups
 	b, _ := os.ReadFile("/etc/group")
 	for _, l := range strings.Split(string(b), "\n") {
 		p := strings.Split(l, ":")
@@ -104,7 +104,7 @@ func setSysPassword(name, pw string, smb bool) (string, error) {
 }
 
 func registerSystem(mux *http.ServeMux, s *storeT) {
-	// Benutzer
+	// users
 	mux.HandleFunc("GET /api/users", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var groups []string
 		b, _ := os.ReadFile("/etc/group")
@@ -127,7 +127,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 			Shell    bool     `json:"shell"`
 		}
 		if readJSON(r, &in) != nil || !sysUserRe.MatchString(in.Name) || len(in.Password) < 5 {
-			fail(w, 400, 400, "Name (klein, ohne Leerzeichen) und Passwort (mind. 5 Zeichen) nötig")
+			fail(w, 400, 400, "name (lowercase, no spaces) and password (min. 5 characters) required")
 			return
 		}
 		shell := "/usr/sbin/nologin"
@@ -137,7 +137,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 		args := []string{"-m", "-s", shell}
 		for _, g := range in.Groups {
 			if !sysUserRe.MatchString(g) {
-				fail(w, 400, 400, "ungültige Gruppe: "+g)
+				fail(w, 400, 400, "invalid group: "+g)
 				return
 			}
 		}
@@ -149,7 +149,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 			return
 		}
 		if out, err := setSysPassword(in.Name, in.Password, in.SMB); err != nil {
-			fail(w, 200, 500, "Benutzer angelegt, Passwort fehlgeschlagen: "+strings.TrimSpace(out))
+			fail(w, 200, 500, "user created, but setting the password failed: "+strings.TrimSpace(out))
 			return
 		}
 		ok(w, in.Name)
@@ -162,13 +162,13 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 			SMB      *bool    `json:"smb"`
 		}
 		if readJSON(r, &in) != nil || !isNormalUser(n) {
-			fail(w, 400, 400, "unbekannter Benutzer")
+			fail(w, 400, 400, "unknown user")
 			return
 		}
 		if in.Groups != nil {
 			for _, g := range in.Groups {
 				if !sysUserRe.MatchString(g) {
-					fail(w, 400, 400, "ungültige Gruppe: "+g)
+					fail(w, 400, 400, "invalid group: "+g)
 					return
 				}
 			}
@@ -192,7 +192,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 				return
 			}
 		} else if in.SMB != nil && *in.SMB && !smb {
-			fail(w, 400, 400, "Für SMB-Zugang bitte ein Passwort setzen")
+			fail(w, 400, 400, "set a password to enable SMB access")
 			return
 		}
 		ok(w, n)
@@ -200,13 +200,13 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 	mux.HandleFunc("DELETE /api/users/{name}", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		n := r.PathValue("name")
 		if !isNormalUser(n) {
-			fail(w, 400, 400, "unbekannter Benutzer")
+			fail(w, 400, 400, "unknown user")
 			return
 		}
 		if smbUsers()[n] {
 			_, _ = run("smbpasswd", "-x", n)
 		}
-		// Home-Ordner bleibt bewusst erhalten (Daten)
+		// the home folder is kept on purpose (data)
 		if out, err := run("userdel", n); err != nil {
 			fail(w, 200, 500, strings.TrimSpace(out))
 			return
@@ -216,7 +216,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 	mux.HandleFunc("POST /api/groups", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var in map[string]string
 		if readJSON(r, &in) != nil || !sysUserRe.MatchString(in["name"]) {
-			fail(w, 400, 400, "ungültiger Gruppenname")
+			fail(w, 400, 400, "invalid group name")
 			return
 		}
 		if out, err := run("groupadd", in["name"]); err != nil {
@@ -226,7 +226,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 		ok(w, in["name"])
 	}))
 
-	// SMB-Freigaben: smb.conf mit Prüfung durch testparm, bei Fehler alte Fassung zurück
+	// SMB shares: smb.conf checked by testparm, restore the old version on error
 	mux.HandleFunc("GET /api/shares/smb", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		b, _ := os.ReadFile("/etc/samba/smb.conf")
 		ok(w, map[string]any{"installed": have("smbd"), "content": string(b)})
@@ -234,7 +234,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 	mux.HandleFunc("PUT /api/shares/smb", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var in map[string]string
 		if readJSON(r, &in) != nil || !have("testparm") {
-			fail(w, 400, 400, "Samba ist nicht installiert")
+			fail(w, 400, 400, "Samba is not installed")
 			return
 		}
 		old, _ := os.ReadFile("/etc/samba/smb.conf")
@@ -245,14 +245,14 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 		}
 		if out, err := run("testparm", "-s", "--suppress-prompt"); err != nil {
 			_ = os.WriteFile("/etc/samba/smb.conf", old, 0o644)
-			fail(w, 200, 500, "Fehler, alte Fassung wiederhergestellt: "+lastLines(out, 6))
+			fail(w, 200, 500, "error, previous version restored: "+lastLines(out, 6))
 			return
 		}
 		_, _ = run("systemctl", "reload-or-restart", "smbd")
-		ok(w, "übernommen")
+		ok(w, "applied")
 	}))
 
-	// Netzwerk (nur lesen; IP-Konfiguration bleibt bei /etc/network bzw. NetworkManager)
+	// network (read only; IP configuration stays with /etc/network or NetworkManager)
 	mux.HandleFunc("GET /api/network", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		addr, _ := exec.Command("ip", "-j", "addr").Output()
 		route, _ := exec.Command("ip", "-j", "route").Output()
@@ -281,7 +281,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 	mux.HandleFunc("PUT /api/hostname", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var in map[string]string
 		if readJSON(r, &in) != nil || !hostRe.MatchString(in["hostname"]) {
-			fail(w, 400, 400, "ungültiger Name (Buchstaben, Ziffern, Bindestrich)")
+			fail(w, 400, 400, "invalid name (letters, digits, hyphen)")
 			return
 		}
 		h := in["hostname"]
@@ -289,7 +289,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 			fail(w, 200, 500, strings.TrimSpace(out))
 			return
 		}
-		// 127.0.1.1-Zeile mitziehen, sonst meckert sudo/Samba
+		// update the 127.0.1.1 line too, otherwise sudo/Samba complain
 		b, _ := os.ReadFile("/etc/hosts")
 		lines := strings.Split(string(b), "\n")
 		found := false
@@ -305,7 +305,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 		ok(w, h)
 	}))
 
-	// Zeit
+	// time
 	mux.HandleFunc("GET /api/time", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		out, _ := run("timedatectl", "show")
 		m := map[string]string{}
@@ -323,12 +323,12 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 			NTP  *bool  `json:"ntp"`
 		}
 		if readJSON(r, &in) != nil {
-			fail(w, 400, 400, "ungültig")
+			fail(w, 400, 400, "invalid")
 			return
 		}
 		if in.Zone != "" {
 			if !zoneRe.MatchString(in.Zone) {
-				fail(w, 400, 400, "ungültige Zeitzone")
+				fail(w, 400, 400, "invalid time zone")
 				return
 			}
 			if out, err := run("timedatectl", "set-timezone", in.Zone); err != nil {

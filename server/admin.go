@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// ── Hintergrund-Jobs (apt, Neustart …) mit mitlaufender Ausgabe ──
+// ── Background jobs (apt, restart …) with live output ──
 type job struct {
 	ID       string    `json:"id"`
 	Title    string    `json:"title"`
@@ -28,9 +28,9 @@ type job struct {
 func (j *job) Write(b []byte) (int, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	if j.out.Len() > 2<<20 { // höchstens 2 MB behalten
+	if j.out.Len() > 2<<20 { // keep at most 2 MB
 		j.out.Reset()
-		j.out.WriteString("… (gekürzt)\n")
+		j.out.WriteString("… (truncated)\n")
 	}
 	return j.out.Write(b)
 }
@@ -74,12 +74,12 @@ func run(name string, args ...string) (string, error) {
 
 var svcName = regexp.MustCompile(`^[a-zA-Z0-9@._-]+\.service$`)
 
-// Dienste, die im Panel auftauchen (der Rest ist Systeminternes)
+// services shown in the panel (the rest is system internals)
 var listedServices = []string{"ssh.service", "nfs-server.service", "smbd.service", "nmbd.service", "rs812-fan.service", "rackpanel.service",
 	"smartmontools.service", "systemd-timesyncd.service", "cron.service", "mdmonitor.service", "wsdd.service", "avahi-daemon.service", "unattended-upgrades.service"}
 
 func registerAdmin(mux *http.ServeMux, s *storeT) {
-	// Dienste
+	// services
 	mux.HandleFunc("GET /api/services", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		list := []map[string]any{}
 		for _, n := range listedServices {
@@ -100,11 +100,11 @@ func registerAdmin(mux *http.ServeMux, s *storeT) {
 	mux.HandleFunc("POST /api/services/{name}/{action}", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		n, a := r.PathValue("name"), r.PathValue("action")
 		if !svcName.MatchString(n) || !map[string]bool{"start": true, "stop": true, "restart": true, "enable": true, "disable": true}[a] {
-			fail(w, 400, 400, "ungültig")
+			fail(w, 400, 400, "invalid")
 			return
 		}
 		if n == "rackpanel.service" && (a == "stop" || a == "disable") {
-			fail(w, 400, 400, "Das Panel kann sich nicht selbst abschalten")
+			fail(w, 400, 400, "the panel cannot switch itself off")
 			return
 		}
 		if n == "rackpanel.service" && a == "restart" {
@@ -120,7 +120,7 @@ func registerAdmin(mux *http.ServeMux, s *storeT) {
 		ok(w, "ok")
 	}))
 
-	// NFS-Freigaben (/etc/exports) lesen und schreiben
+	// NFS exports (/etc/exports): read and write
 	mux.HandleFunc("GET /api/shares/nfs", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		b, _ := os.ReadFile("/etc/exports")
 		active, _ := run("exportfs", "-v")
@@ -129,7 +129,7 @@ func registerAdmin(mux *http.ServeMux, s *storeT) {
 	mux.HandleFunc("PUT /api/shares/nfs", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var in map[string]string
 		if readJSON(r, &in) != nil {
-			fail(w, 400, 400, "ungültig")
+			fail(w, 400, 400, "invalid")
 			return
 		}
 		old, _ := os.ReadFile("/etc/exports")
@@ -139,18 +139,18 @@ func registerAdmin(mux *http.ServeMux, s *storeT) {
 			return
 		}
 		if out, err := run("exportfs", "-ra"); err != nil {
-			_ = os.WriteFile("/etc/exports", old, 0o644) // bei Fehler alte Fassung zurück
+			_ = os.WriteFile("/etc/exports", old, 0o644) // on error restore the old version
 			_, _ = run("exportfs", "-ra")
-			fail(w, 200, 500, "Fehler, alte Freigaben wiederhergestellt: "+strings.TrimSpace(out))
+			fail(w, 200, 500, "error, previous exports restored: "+strings.TrimSpace(out))
 			return
 		}
-		ok(w, "übernommen")
+		ok(w, "applied")
 	}))
 
-	// Updates: Liste der verfügbaren Pakete, dann apt upgrade als Job
+	// updates: list upgradable packages, then apt upgrade as a job
 	mux.HandleFunc("POST /api/updates/check", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		if !aptBusy.TryLock() {
-			fail(w, 200, 409, "apt läuft bereits")
+			fail(w, 200, 409, "apt is already running")
 			return
 		}
 		defer aptBusy.Unlock()
@@ -174,12 +174,12 @@ func registerAdmin(mux *http.ServeMux, s *storeT) {
 		pkgs := strings.Fields(in["packages"])
 		for _, p := range pkgs {
 			if !regexp.MustCompile(`^[a-z0-9][a-z0-9+.-]*$`).MatchString(p) {
-				fail(w, 400, 400, "ungültiger Paketname: "+p)
+				fail(w, 400, 400, "invalid package name: "+p)
 				return
 			}
 		}
 		if len(pkgs) == 0 {
-			fail(w, 400, 400, "keine Pakete")
+			fail(w, 400, 400, "no packages")
 			return
 		}
 		j := startJob("Installieren: "+strings.Join(pkgs, " "), "apt-get", append([]string{"install", "-y"}, pkgs...)...)
@@ -190,7 +190,7 @@ func registerAdmin(mux *http.ServeMux, s *storeT) {
 		j := jobs.m[r.PathValue("id")]
 		jobs.Unlock()
 		if j == nil {
-			fail(w, 404, 404, "unbekannt")
+			fail(w, 404, 404, "unknown")
 			return
 		}
 		j.mu.Lock()
@@ -198,13 +198,13 @@ func registerAdmin(mux *http.ServeMux, s *storeT) {
 		ok(w, map[string]any{"id": j.ID, "title": j.Title, "running": j.Running, "exit_code": j.ExitCode, "output": j.out.String()})
 	}))
 
-	// Protokolle
+	// logs
 	mux.HandleFunc("GET /api/logs", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		unit := r.URL.Query().Get("unit")
 		args := []string{"-n", "400", "--no-pager", "-o", "short-iso"}
 		if unit != "" {
 			if !svcName.MatchString(unit) {
-				fail(w, 400, 400, "ungültig")
+				fail(w, 400, 400, "invalid")
 				return
 			}
 			args = append(args, "-u", unit)
@@ -216,11 +216,11 @@ func registerAdmin(mux *http.ServeMux, s *storeT) {
 		ok(w, out)
 	}))
 
-	// Energie
+	// power
 	mux.HandleFunc("POST /api/power/{action}", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		a := r.PathValue("action")
 		if a != "reboot" && a != "poweroff" {
-			fail(w, 400, 400, "ungültig")
+			fail(w, 400, 400, "invalid")
 			return
 		}
 		ok(w, a)

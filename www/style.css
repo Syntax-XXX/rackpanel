@@ -29,13 +29,13 @@ body {
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--accent); }
 
-/* ── Hintergrund: weiche Farbflächen, langsam treibend ── */
+/* ── Background: soft colour blobs, slowly drifting ── */
 .backdrop { position: fixed; inset: 0; overflow: hidden; z-index: 0; }
 .backdrop i {
   position: absolute; width: 80vmax; height: 80vmax; border-radius: 50%;
   opacity: .7; animation: drift 38s ease-in-out infinite alternate;
 }
-/* Verläufe statt filter:blur – weich in jedem Browser und billig für schwache Clients */
+/* gradients instead of filter:blur – soft in every browser and cheap for weak clients */
 .backdrop i:nth-child(1) { background: radial-gradient(circle, rgba(14,165,164,.75), transparent 62%); left: -28vmax; top: -32vmax; }
 .backdrop i:nth-child(2) { background: radial-gradient(circle, rgba(109,40,217,.7), transparent 62%); right: -30vmax; top: 0; animation-duration: 46s; }
 .backdrop i:nth-child(3) { background: radial-gradient(circle, rgba(29,78,216,.6), transparent 62%); left: 10vmax; bottom: -42vmax; animation-duration: 52s; }
@@ -54,7 +54,7 @@ a { color: var(--accent); }
   box-shadow: 0 10px 40px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .06);
 }
 
-/* ── Grundgerüst ── */
+/* ── Layout ── */
 .app { position: relative; z-index: 1; display: flex; height: 100vh; height: 100dvh; gap: 18px; padding: 18px; }
 .side { width: 232px; flex: none; display: flex; flex-direction: column; padding: 18px 12px; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; font-weight: 700; font-size: 17px; letter-spacing: .2px; }

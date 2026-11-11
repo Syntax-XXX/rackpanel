@@ -16,7 +16,7 @@ type raidInfo struct {
 	Level   string   `json:"level"`
 	State   string   `json:"state"`
 	Members []string `json:"members"`
-	Status  string   `json:"status"` // z. B. [4/3] [UUU_]
+	Status  string   `json:"status"` // e.g. [4/3] [UUU_]
 	Mount   string   `json:"mount"`
 	Sync    string   `json:"sync,omitempty"`
 }
@@ -76,17 +76,17 @@ func registerStorage(mux *http.ServeMux, s *storeT) {
 	mux.HandleFunc("GET /api/storage/smart/{dev}", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		dev := r.PathValue("dev")
 		if !devRe.MatchString(dev) {
-			fail(w, 400, 400, "ungültig")
+			fail(w, 400, 400, "invalid")
 			return
 		}
 		b, _ := exec.Command("smartctl", "-n", "standby", "-a", "/dev/"+dev).CombinedOutput()
 		ok(w, string(b))
 	}))
-	// Platte sofort schlafen legen bzw. Ruhezeit setzen (hdparm -S: 0=aus, 1..240 = n×5 s, 241..251 = (n-240)×30 min)
+	// put a disk to sleep now / set the standby time (hdparm -S: 0=off, 1..240 = n×5 s, 241..251 = (n-240)×30 min)
 	mux.HandleFunc("POST /api/storage/{dev}/sleep", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		dev := r.PathValue("dev")
 		if !devRe.MatchString(dev) || !strings.HasPrefix(dev, "sd") {
-			fail(w, 400, 400, "ungültig")
+			fail(w, 400, 400, "invalid")
 			return
 		}
 		out, err := run("hdparm", "-y", "/dev/"+dev)
@@ -97,7 +97,7 @@ func registerStorage(mux *http.ServeMux, s *storeT) {
 		disksCache.Lock()
 		disksCache.at = time.Time{}
 		disksCache.Unlock()
-		ok(w, "schläft")
+		ok(w, "asleep")
 	}))
 	mux.HandleFunc("PUT /api/storage/spindown", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var in struct {
@@ -143,7 +143,7 @@ func registerStorage(mux *http.ServeMux, s *storeT) {
 	}))
 }
 
-// applySpindown: gespeicherte Ruhezeit beim Start wieder setzen (hdparm-Werte gehen beim Neustart verloren)
+// applySpindown: re-apply the saved standby time at startup (hdparm values are lost on reboot)
 func applySpindown() {
 	b, err := os.ReadFile(*dataDir + "/spindown")
 	if err != nil {

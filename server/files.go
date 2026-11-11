@@ -21,13 +21,13 @@ import (
 	"time"
 )
 
-// Erlaubte Bereiche für den Datei-Manager (alles andere wird abgelehnt)
-var fileRoots []string // aus -roots oder automatisch (siehe detectRoots)
+// allowed areas for the file manager (everything else is rejected)
+var fileRoots []string // from -roots or detected (see detectRoots)
 
-// safePath: absoluter, bereinigter Pfad innerhalb eines erlaubten Bereichs (auch nach Symlink-Auflösung)
+// safePath: absolute, cleaned path inside an allowed area (also after resolving symlinks)
 func safePath(p string) (string, error) {
 	if p == "" {
-		return "", errors.New("kein Pfad")
+		return "", errors.New("no path")
 	}
 	c := filepath.Clean("/" + p)
 	check := c
@@ -41,7 +41,7 @@ func safePath(p string) (string, error) {
 			return c, nil
 		}
 	}
-	return "", fmt.Errorf("Pfad nicht erlaubt: %s", c)
+	return "", fmt.Errorf("path not allowed: %s", c)
 }
 
 func isRoot(p string) bool {
@@ -69,7 +69,7 @@ func itemOf(path string, fi fs.FileInfo) fsItem {
 		Modified: fi.ModTime(), Write: true, Extensions: map[string]any{"mounted": false}}
 }
 
-// ── Kopier-/Verschiebe-Aufgaben mit Fortschritt (Ereignis casaos:file:operate) ──
+// ── Copy/move tasks with progress ──
 type fileTask struct {
 	ID            string           `json:"id"`
 	Type          string           `json:"type"`
@@ -158,7 +158,7 @@ func copyTree(src, dst string, t *fileTask) error {
 	})
 }
 
-// uniqueTarget: bei Namenskonflikt "name (1).ext" usw. (style "skip" überspringt, "overwrite" ersetzt)
+// uniqueTarget: on name clash "name (1).ext" etc. (style "skip" skips, "overwrite" replaces)
 func uniqueTarget(p string) string {
 	if _, err := os.Lstat(p); err != nil {
 		return p
@@ -218,7 +218,7 @@ func runTask(t *fileTask) {
 }
 
 func registerFiles(mux *http.ServeMux, s *storeT) {
-	// Ordnerinhalt (Index/Größe wie bei CasaOS; ohne Angabe: alles)
+	// folder listing (index/size paging; without them: everything)
 	mux.HandleFunc("GET /api/files", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		q := r.URL.Query()
 		if p := q.Get("path"); p == "" || p == "/" {
@@ -294,7 +294,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		a, err1 := safePath(in["old_path"])
 		b, err2 := safePath(in["new_path"])
 		if err1 != nil || err2 != nil || isRoot(a) {
-			fail(w, 400, 400, "Pfad nicht erlaubt")
+			fail(w, 400, 400, "path not allowed")
 			return
 		}
 		if _, err := os.Lstat(b); err == nil {
@@ -327,7 +327,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		ok(w, len(ents))
 	}))
 
-	// Neue leere Datei / Inhalt lesen / Inhalt speichern (Text-Editor der Oberfläche)
+	// new empty file / read content / save content (text editor in the UI)
 	mux.HandleFunc("POST /api/files/touch", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var in map[string]string
 		_ = readJSON(r, &in)
@@ -351,7 +351,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 			return
 		}
 		if fi, err := os.Stat(p); err != nil || fi.Size() > 5<<20 {
-			fail(w, 200, 500, "Datei zu groß oder nicht lesbar")
+			fail(w, 200, 500, "file too large or not readable")
 			return
 		}
 		b, _ := os.ReadFile(p)
@@ -372,7 +372,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		ok(w, p)
 	}))
 
-	// Einzelne Datei herunterladen/anzeigen (Token als ?token=, da Links im Browser geöffnet werden)
+	// download/show a single file (token as ?token=, links are opened by the browser)
 	mux.HandleFunc("GET /api/files/raw", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		p, err := safePath(r.URL.Query().Get("path"))
 		if err != nil {
@@ -387,20 +387,20 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		defer f.Close()
 		fi, _ := f.Stat()
 		if fi.IsDir() {
-			fail(w, 400, 400, "Ordner")
+			fail(w, 400, 400, "is a folder")
 			return
 		}
 		w.Header().Set("Content-Disposition", "attachment; filename*=utf-8''"+url.PathEscape(fi.Name()))
 		http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 	}))
-	// Vorschau (Bilder, Videos, PDFs inline)
+	// preview (images, videos, PDFs inline)
 	mux.HandleFunc("GET /api/files/preview", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		p, err := safePath(r.URL.Query().Get("path"))
 		if err != nil {
 			fail(w, 400, 400, err.Error())
 			return
 		}
-		// Hochgeladene HTML/SVG dürfen im Panel-Ursprung kein Skript ausführen
+		// uploaded HTML/SVG must not run scripts in the panel origin
 		w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if ct := mime.TypeByExtension(filepath.Ext(p)); ct != "" {
@@ -409,7 +409,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		http.ServeFile(w, r, p)
 	}))
 
-	// Mehrere Dateien/Ordner als ZIP (format=zip, files=Pfad1,Pfad2…)
+	// several files/folders as ZIP (files=path1,path2…)
 	mux.HandleFunc("GET /api/files/download", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var paths []string
 		for _, f := range strings.Split(r.URL.Query().Get("files"), ",") {
@@ -418,7 +418,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 			}
 		}
 		if len(paths) == 0 {
-			fail(w, 400, 400, "keine Dateien")
+			fail(w, 400, 400, "no files")
 			return
 		}
 		if len(paths) == 1 {
@@ -458,14 +458,14 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		_ = zw.Close()
 	}))
 
-	// Löschen: Body ist eine Liste von Pfaden
+	// delete: body is a list of paths
 	mux.HandleFunc("POST /api/files/delete", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var paths []string
 		_ = readJSON(r, &paths)
 		for _, raw := range paths {
 			p, err := safePath(raw)
 			if err != nil || isRoot(p) {
-				fail(w, 400, 400, "Pfad nicht erlaubt: "+raw)
+				fail(w, 400, 400, "path not allowed: "+raw)
 				return
 			}
 			if err := os.RemoveAll(p); err != nil {
@@ -476,11 +476,11 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		ok(w, paths)
 	}))
 
-	// Kopieren/Verschieben im Hintergrund
+	// copy/move in the background
 	mux.HandleFunc("POST /api/files/task", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		var t fileTask
 		if err := readJSON(r, &t); err != nil {
-			fail(w, 400, 400, "ungültig")
+			fail(w, 400, 400, "invalid")
 			return
 		}
 		to, err := safePath(t.To)
@@ -493,7 +493,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 			from, _ := it["from"].(string)
 			p, err := safePath(from)
 			if err != nil || isRoot(p) || to == p || strings.HasPrefix(to, p+"/") {
-				fail(w, 400, 400, "Quelle nicht erlaubt: "+from)
+				fail(w, 400, 400, "source not allowed: "+from)
 				return
 			}
 			it["from"] = p
@@ -515,10 +515,10 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		ok(w, tasks.last)
 	}))
 	mux.HandleFunc("DELETE /api/files/tasks/{id}", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
-		ok(w, r.PathValue("id")) // laufende Kopien werden nicht abgebrochen (shortcut: kein Abbruch, bei Bedarf Kontext einbauen)
+		ok(w, r.PathValue("id")) // shortcut: running copies are not cancelled, add a context if cancelling is needed
 	}))
 
-	// Hochladen in Stücken (vue-simple-uploader): GET prüft vorhandene Stücke, POST speichert eines
+	// chunked upload: GET checks for an existing chunk, POST stores one
 	chunkDir := func(path, ident string, total int) string {
 		h := strings.Map(func(r rune) rune {
 			if r == '/' || r == '\\' || r == '.' {
@@ -540,7 +540,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 			ok(w, "vorhanden")
 			return
 		}
-		w.WriteHeader(http.StatusNoContent) // Stück fehlt -> Client lädt es hoch
+		w.WriteHeader(http.StatusNoContent) // chunk missing -> client uploads it
 	})
 	uploadPost := s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		if err := r.ParseMultipartForm(32 << 20); err != nil {
@@ -600,10 +600,10 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		}
 		ents, _ := os.ReadDir(dir)
 		if len(ents) < total {
-			ok(w, "stück")
+			ok(w, "chunk")
 			return
 		}
-		// alle Stücke da -> zusammensetzen
+		// all chunks present -> assemble
 		outF, err := os.Create(dst)
 		if err != nil {
 			fail(w, 200, 500, err.Error())
@@ -613,7 +613,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 			c, err := os.Open(filepath.Join(dir, strconv.Itoa(i)))
 			if err != nil {
 				outF.Close()
-				fail(w, 200, 500, "Stück fehlt: "+strconv.Itoa(i))
+				fail(w, 200, 500, "chunk missing: "+strconv.Itoa(i))
 				return
 			}
 			_, _ = io.Copy(outF, c)
@@ -621,7 +621,7 @@ func registerFiles(mux *http.ServeMux, s *storeT) {
 		}
 		outF.Close()
 		_ = os.RemoveAll(dir)
-		_ = os.Remove(filepath.Join(p, ".temp")) // nur wenn leer
+		_ = os.Remove(filepath.Join(p, ".temp")) // only if empty
 		ok(w, "fertig")
 	})
 	mux.HandleFunc("GET /api/files/upload", uploadGet)

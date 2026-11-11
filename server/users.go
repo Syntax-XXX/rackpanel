@@ -30,7 +30,7 @@ type user struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-// public: so wie CasaOS den Benutzer an die Oberfläche gibt (ohne Passwort)
+// public: user as sent to the web UI (without password)
 func (u user) public() map[string]any {
 	return map[string]any{"id": u.ID, "username": u.Username, "role": u.Role, "email": u.Email,
 		"nickname": u.Nickname, "avatar": u.Avatar, "description": u.Description, "created_at": u.CreatedAt}
@@ -43,7 +43,7 @@ type state struct {
 	NextID int      `json:"next_id"`
 }
 
-// apiKey: dauerhafter Schlüssel für fremde Dashboards; gespeichert wird nur der SHA-256
+// apiKey: long-lived key for other dashboards; only its SHA-256 is stored
 type apiKey struct {
 	ID       string    `json:"id"`
 	Name     string    `json:"name"`
@@ -77,7 +77,7 @@ func loadStore(path string) *storeT {
 	return s
 }
 
-// save: atomar schreiben (Datei nur für root lesbar, enthält Passwort-Hashes und das Token-Geheimnis)
+// save: atomic write (root-only file, holds password hashes and the token secret)
 func (s *storeT) save() {
 	b, _ := json.MarshalIndent(s.st, "", "  ")
 	tmp := s.path + ".tmp"
@@ -104,7 +104,7 @@ func (s *storeT) userByID(id int) *user {
 	return nil
 }
 
-// ── Tokens: HMAC-SHA256, Format base64(json).base64(sig) ─────────────────────
+// ── Tokens: HMAC-SHA256, format base64(json).base64(sig) ──
 type claims struct {
 	UID  int    `json:"uid"`
 	Kind string `json:"kind"` // access | refresh
@@ -123,7 +123,7 @@ func (s *storeT) verify(tok, kind string) (*user, error) {
 	tok = strings.TrimPrefix(strings.TrimSpace(tok), "Bearer ")
 	parts := strings.Split(tok, ".")
 	if len(parts) != 2 {
-		return nil, errors.New("ungültig")
+		return nil, errors.New("invalid")
 	}
 	m := hmac.New(sha256.New, []byte(s.st.Secret))
 	m.Write([]byte(parts[0]))
@@ -143,7 +143,7 @@ func (s *storeT) verify(tok, kind string) (*user, error) {
 	defer s.mu.Unlock()
 	u := s.userByID(c.UID)
 	if u == nil {
-		return nil, errors.New("Benutzer weg")
+		return nil, errors.New("user gone")
 	}
 	cp := *u
 	return &cp, nil
@@ -158,8 +158,8 @@ func (s *storeT) tokens(u *user) map[string]any {
 	}
 }
 
-// auth: Handler nur mit gültigem Access-Token (Header "Authorization" ohne/mit Bearer, oder ?token=)
-// oder mit API-Schlüssel (rp_…, auch über den Header X-API-Key). Nur-Lese-Schlüssel dürfen nur GET.
+// auth: handler only with a valid access token (header "Authorization" with/without Bearer, or ?token=)
+// or an API key (rp_…, also via header X-API-Key). Read-only keys may only GET.
 func (s *storeT) auth(h func(http.ResponseWriter, *http.Request, *user)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tok := r.Header.Get("Authorization")
@@ -182,11 +182,11 @@ func (s *storeT) auth(h func(http.ResponseWriter, *http.Request, *user)) http.Ha
 			}
 			s.mu.Unlock()
 			if k == nil {
-				fail(w, http.StatusUnauthorized, 401, "API-Schlüssel ungültig")
+				fail(w, http.StatusUnauthorized, 401, "invalid API key")
 				return
 			}
 			if k.ReadOnly && r.Method != http.MethodGet && r.Method != http.MethodHead {
-				fail(w, http.StatusForbidden, 403, "Dieser API-Schlüssel darf nur lesen")
+				fail(w, http.StatusForbidden, 403, "this API key is read-only")
 				return
 			}
 			h(w, r, &user{Username: "key:" + k.Name, Role: "key"})
@@ -194,25 +194,25 @@ func (s *storeT) auth(h func(http.ResponseWriter, *http.Request, *user)) http.Ha
 		}
 		u, err := s.verify(tok, "access")
 		if err != nil {
-			fail(w, http.StatusUnauthorized, 401, "nicht angemeldet")
+			fail(w, http.StatusUnauthorized, 401, "not signed in")
 			return
 		}
 		h(w, r, u)
 	}
 }
 
-// session: wie auth, aber nur für angemeldete Menschen – ein API-Schlüssel darf weder Schlüssel noch Passwort ändern
+// session: like auth, but only for signed-in humans – an API key may change neither keys nor the password
 func (s *storeT) session(h func(http.ResponseWriter, *http.Request, *user)) http.HandlerFunc {
 	return s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		if u.Role == "key" {
-			fail(w, http.StatusForbidden, 403, "Nur mit Anmeldung möglich")
+			fail(w, http.StatusForbidden, 403, "requires signing in")
 			return
 		}
 		h(w, r, u)
 	})
 }
 
-// ── Anmelde-Bremse gegen Durchprobieren ──────────────────────────────────────
+// ── Login brake against brute force ──
 var loginFails = struct {
 	sync.Mutex
 	m map[string][]time.Time
@@ -245,10 +245,10 @@ func clientIP(r *http.Request) string {
 	return h
 }
 
-// setUser legt den Panel-Benutzer an oder setzt sein Passwort (Installer: rackpanel -set-user NAME, Passwort über stdin)
+// setUser creates the panel user or sets its password (installer: rackpanel -set-user NAME, password on stdin)
 func (s *storeT) setUser(name, password string) error {
 	if !userRe.MatchString(name) || len(password) < 5 {
-		return errors.New("Benutzername ungültig oder Passwort kürzer als 5 Zeichen")
+		return errors.New("invalid username or password shorter than 5 characters")
 	}
 	h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -272,12 +272,12 @@ func registerUsers(mux *http.ServeMux, s *storeT) {
 	mux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP(r)
 		if tooManyFails(ip) {
-			fail(w, http.StatusTooManyRequests, 429, "Zu viele Fehlversuche, bitte 10 Minuten warten")
+			fail(w, http.StatusTooManyRequests, 429, "too many failed attempts, please wait 10 minutes")
 			return
 		}
 		var in map[string]string
 		if readJSON(r, &in) != nil {
-			fail(w, 400, 400, "ungültige Anfrage")
+			fail(w, 400, 400, "invalid request")
 			return
 		}
 		s.mu.Lock()
@@ -289,7 +289,7 @@ func registerUsers(mux *http.ServeMux, s *storeT) {
 		s.mu.Unlock()
 		if u == nil || bcrypt.CompareHashAndPassword([]byte(cp.Hash), []byte(in["password"])) != nil {
 			noteFail(ip)
-			fail(w, 401, 401, "Benutzer oder Passwort falsch")
+			fail(w, 401, 401, "wrong username or password")
 			return
 		}
 		ok(w, map[string]any{"token": s.tokens(&cp), "user": cp.public()})
@@ -320,10 +320,10 @@ func registerUsers(mux *http.ServeMux, s *storeT) {
 			fail(w, 400, 400, err.Error())
 			return
 		}
-		ok(w, "geändert")
+		ok(w, "changed")
 	}))
 
-	// API-Schlüssel
+	// API keys
 	mux.HandleFunc("GET /api/keys", s.session(func(w http.ResponseWriter, r *http.Request, u *user) {
 		out := []map[string]any{}
 		s.mu.Lock()
@@ -339,7 +339,7 @@ func registerUsers(mux *http.ServeMux, s *storeT) {
 			ReadOnly bool   `json:"read_only"`
 		}
 		if readJSON(r, &in) != nil || strings.TrimSpace(in.Name) == "" || len(in.Name) > 60 {
-			fail(w, 400, 400, "Name fehlt")
+			fail(w, 400, 400, "name missing")
 			return
 		}
 		buf := make([]byte, 24)
@@ -349,7 +349,7 @@ func registerUsers(mux *http.ServeMux, s *storeT) {
 		s.st.Keys = append(s.st.Keys, apiKey{ID: hex.EncodeToString(buf[:4]), Name: strings.TrimSpace(in.Name), Hash: keyHash(key), ReadOnly: in.ReadOnly, Created: time.Now()})
 		s.save()
 		s.mu.Unlock()
-		ok(w, map[string]any{"key": key}) // nur dieses eine Mal sichtbar
+		ok(w, map[string]any{"key": key}) // shown only this once
 	}))
 	mux.HandleFunc("DELETE /api/keys/{id}", s.session(func(w http.ResponseWriter, r *http.Request, u *user) {
 		s.mu.Lock()
@@ -362,6 +362,6 @@ func registerUsers(mux *http.ServeMux, s *storeT) {
 		s.st.Keys = keep
 		s.save()
 		s.mu.Unlock()
-		ok(w, "gelöscht")
+		ok(w, "deleted")
 	}))
 }

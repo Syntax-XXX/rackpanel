@@ -1,51 +1,67 @@
 # RackPanel
 
-Eine schlanke Weboberfläche für dein NAS – wie DSM, nur für ganz normales Debian. Ein einzelnes Programm ohne Datenbank,
-läuft auch auf alter Hardware mit 512 MB RAM (ARMv5), genauso auf Raspberry Pi und PCs.
+**English** · [Deutsch](README.de.md)
 
-**Was drin ist:** Übersicht mit Live-Werten · Speicher (SMART, RAID, Ruhezustand) · Dateimanager · SMB- und NFS-Freigaben ·
-Benutzer und Gruppen · Apps · Netzwerk · Dienste · Updates und Pakete · Protokolle · Zeit, Neustart, Herunterfahren ·
-[API für eigene Dashboards](docs/API.md)
+A lightweight web UI for your NAS – like DSM, but for plain Debian. One program, no database,
+runs even on old hardware with 512 MB RAM (ARMv5), just as well on a Raspberry Pi or a PC.
 
-## Installieren
+**Features:** live overview · storage (SMART, RAID, disk standby) · file manager · SMB and NFS shares ·
+users and groups · apps · network · services · updates and packages · logs · time, restart, shutdown ·
+[API for your own dashboards](docs/API.md)
 
-Als root im Terminal einfügen:
+## Install
+
+Paste as root into a terminal:
 
 ```sh
 bash <(curl -fsSL https://raw.githubusercontent.com/Syntax-XXX/rackpanel/main/install.sh)
 ```
 
-Der Installer fragt nach Benutzername, Passwort und Port, richtet alles ein und zeigt am Ende die Adresse an.
-Braucht Debian oder Ubuntu mit systemd (armv5, armv7, arm64, amd64).
+The installer asks for username, password and port, adds the [RSRB package repository](https://syntax-xxx.github.io/rsrb/),
+installs the `rackpanel` package and shows the address at the end.
+Needs Debian or Ubuntu with systemd (armel, armhf, arm64, amd64).
 
-Ohne Fragen, z. B. in Skripten:
+Already have the RSRB repository? Then it's just:
 
 ```sh
-RACKPANEL_YES=1 RACKPANEL_USER=admin RACKPANEL_PASSWORD='geheim' bash <(curl -fsSL https://raw.githubusercontent.com/Syntax-XXX/rackpanel/main/install.sh)
+sudo apt install rackpanel        # asks for user and password
 ```
 
-Aktualisieren: den Installer noch einmal ausführen. Entfernen: `… install.sh) --uninstall`.
+Without questions, e.g. in scripts:
 
-## Synology RS812 ohne DSM
+```sh
+RACKPANEL_YES=1 RACKPANEL_USER=admin RACKPANEL_PASSWORD='secret' bash <(curl -fsSL https://raw.githubusercontent.com/Syntax-XXX/rackpanel/main/install.sh)
+```
 
-RackPanel ist für eine Synology RS812 entstanden, auf der statt DSM ein aktuelles Debian läuft.
-Wie das geht (Kernel, Bootvorgang, Lüfter, Wiederherstellung): **[rs812-debian](https://github.com/Syntax-XXX/rs812-debian)**.
+**Update:** `apt upgrade` or *Updates & Packages* in the panel. **Change port/user:** `dpkg-reconfigure rackpanel`.
+**Forgot the password:** `rackpanel -set-user admin` (reads the new password from stdin). **Remove:** `apt remove rackpanel`.
+
+## Synology RS812 without DSM
+
+RackPanel was made for a Synology RS812 running current Debian instead of DSM.
+How that works (kernel, boot, fan, recovery): **[rs812-debian](https://github.com/Syntax-XXX/rs812-debian)**.
 
 ## Apps
 
-Apps sind normale Debian-Pakete mit Dienst und Weboberfläche (Transmission, MiniDLNA, Mosquitto, FTP).
-Der Katalog steht in [`www/apps.json`](www/apps.json) – ein Eintrag pro App, Vorschläge willkommen.
-Container (Docker/Podman) gibt es bewusst nicht: Für ARMv5 existieren kaum Images und 512 MB sind dafür zu wenig.
+Apps are regular Debian packages with a service and a web UI (Transmission, MiniDLNA, Mosquitto, FTP).
+The catalog lives in [`www/apps.json`](www/apps.json) – one entry per app, suggestions welcome.
+There is deliberately no Docker/Podman: the RS812 kernel has no memory cgroups or overlayfs, hardly any
+images exist for ARMv5, and 512 MB is too little for containers.
 
-## Selbst bauen
+## Build
 
 ```sh
-./build.sh 1.0.0        # braucht Go 1.22+, legt die Archive in dist/ ab
+./build.sh 1.1.0        # needs Go 1.22+, puts the release archives into dist/
 ```
 
-Die Oberfläche in `www/` ist reines HTML/CSS/JS ohne Build-Schritt, der Server in `server/` hat eine einzige Abhängigkeit (bcrypt).
+The web UI in `www/` is plain HTML/CSS/JS without a build step; the server in `server/` has a single dependency (bcrypt).
+Debian packages and the repository are built in [rsrb](https://github.com/Syntax-XXX/rsrb).
 
-## Sicherheit
+## Security
 
-RackPanel läuft als root und ist für das eigene Netz gedacht. Nicht ungeschützt ins Internet stellen – dafür ein VPN
-(z. B. Tailscale oder WireGuard) davor setzen.
+RackPanel runs as root and is meant for your own network. Don't expose it to the internet – put a VPN
+(e.g. Tailscale or WireGuard) in front of it.
+
+## License
+
+MIT
