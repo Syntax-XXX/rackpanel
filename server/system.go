@@ -184,7 +184,7 @@ func registerSystem(mux *http.ServeMux, s *storeT) {
 		}
 		if in.Password != "" {
 			if len(in.Password) < 5 {
-				fail(w, 400, 400, "Passwort zu kurz")
+				fail(w, 400, 400, "password too short")
 				return
 			}
 			if out, err := setSysPassword(n, in.Password, smb || in.SMB != nil && *in.SMB); err != nil {

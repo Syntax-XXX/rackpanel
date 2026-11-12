@@ -39,7 +39,7 @@ Ein Nur-Lese-Schlüssel im Browser ist für jeden sichtbar, der die Seite öffne
 | Methode | Pfad | Liefert |
 |---|---|---|
 | GET | `/api/overview` | Name, Modell, System, Laufzeit, Last, Temperaturen, Lüfter, Laufwerke, Volumes, RAID, Netzwerk, Speicher |
-| GET | `/api/stats` | Momentaufnahme: CPU %, Arbeitsspeicher, Netzwerk-Durchsatz, Last (für Live-Anzeigen, z. B. alle 3 s) |
+| GET | `/api/stats` | Momentaufnahme: CPU %, Arbeitsspeicher, Netzwerk-Zähler, Platten-I/O-Zähler (`io`: gelesene/geschriebene Bytes pro Platte und RAID-Array), Last (für Live-Anzeigen, z. B. alle 3 s) |
 | GET | `/api/storage` | Laufwerke (SMART), RAID-Gruppen, Volumes |
 | GET | `/api/storage/smart/{dev}` | SMART-Bericht eines Laufwerks, z. B. `sda` |
 | GET | `/api/services` | Dienste mit Zustand |

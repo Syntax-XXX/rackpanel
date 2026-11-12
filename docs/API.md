@@ -39,7 +39,7 @@ A read-only key inside a web page is visible to anyone who can open that page â€
 | Method | Path | Returns |
 |---|---|---|
 | GET | `/api/overview` | name, model, OS, uptime, load, temperatures, fan, drives, volumes, RAID, network, memory |
-| GET | `/api/stats` | snapshot: CPU %, memory, network counters, load (for live views, e.g. every 3 s) |
+| GET | `/api/stats` | snapshot: CPU %, memory, network counters, disk I/O counters (`io`: bytes read/written per disk and RAID array), load (for live views, e.g. every 3 s) |
 | GET | `/api/storage` | drives (SMART), RAID arrays, volumes |
 | GET | `/api/storage/smart/{dev}` | SMART report of one drive, e.g. `sda` |
 | GET | `/api/services` | services and their state |

@@ -117,6 +117,6 @@ func main() {
 	})
 
 	srv := &http.Server{Addr: *listen, Handler: cors(mux), ReadHeaderTimeout: 15 * time.Second}
-	log.Printf("RackPanel %s auf %s (Dateien: %s)", version, *listen, strings.Join(fileRoots, ", "))
+	log.Printf("RackPanel %s on %s (files: %s)", version, *listen, strings.Join(fileRoots, ", "))
 	log.Fatal(srv.ListenAndServe())
 }

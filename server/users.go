@@ -129,7 +129,7 @@ func (s *storeT) verify(tok, kind string) (*user, error) {
 	m.Write([]byte(parts[0]))
 	want := base64.RawURLEncoding.EncodeToString(m.Sum(nil))
 	if !hmac.Equal([]byte(want), []byte(parts[1])) {
-		return nil, errors.New("Signatur falsch")
+		return nil, errors.New("bad signature")
 	}
 	b, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
@@ -299,7 +299,7 @@ func registerUsers(mux *http.ServeMux, s *storeT) {
 		_ = readJSON(r, &in)
 		u, err := s.verify(in["refresh_token"], "refresh")
 		if err != nil {
-			fail(w, http.StatusUnauthorized, 401, "Sitzung abgelaufen")
+			fail(w, http.StatusUnauthorized, 401, "session expired")
 			return
 		}
 		ok(w, s.tokens(u))
@@ -313,7 +313,7 @@ func registerUsers(mux *http.ServeMux, s *storeT) {
 		bad := bcrypt.CompareHashAndPassword([]byte(p.Hash), []byte(in["old_password"])) != nil
 		s.mu.Unlock()
 		if bad {
-			fail(w, 400, 400, "Altes Passwort falsch")
+			fail(w, 400, 400, "old password is wrong")
 			return
 		}
 		if err := s.setUser(u.Username, in["password"]); err != nil {

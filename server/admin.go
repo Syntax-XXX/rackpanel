@@ -58,7 +58,7 @@ func startJob(title string, name string, args ...string) *job {
 			j.ExitCode = ee.ExitCode()
 		} else if err != nil {
 			j.ExitCode = -1
-			fmt.Fprintf(&j.out, "\nFehler: %v\n", err)
+			fmt.Fprintf(&j.out, "\nError: %v\n", err)
 		}
 		j.mu.Unlock()
 	}()

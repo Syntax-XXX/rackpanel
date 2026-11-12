@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -99,6 +100,34 @@ func netStats() []netStat {
 	return out
 }
 
+// diskIO: cumulative bytes read/written per whole disk and md array (from /proc/diskstats)
+type diskIO struct {
+	Name  string `json:"name"`
+	Read  uint64 `json:"read"`
+	Write uint64 `json:"write"`
+}
+
+var wholeDisk = regexp.MustCompile(`^(sd[a-z]+|vd[a-z]+|hd[a-z]+|md\d+|nvme\d+n\d+|mmcblk\d+)$`)
+
+func parseDiskstats(s string) []diskIO {
+	out := []diskIO{}
+	for _, l := range strings.Split(s, "\n") {
+		p := strings.Fields(l)
+		if len(p) < 10 || !wholeDisk.MatchString(p[2]) {
+			continue
+		}
+		r, _ := strconv.ParseUint(p[5], 10, 64) // sectors are always 512 bytes here
+		w, _ := strconv.ParseUint(p[9], 10, 64)
+		out = append(out, diskIO{p[2], r * 512, w * 512})
+	}
+	return out
+}
+
+func diskIOStats() []diskIO {
+	b, _ := os.ReadFile("/proc/diskstats")
+	return parseDiskstats(string(b))
+}
+
 // volumes: all mounted block filesystems (/, /volumeN, /mnt/…) – size/usage in bytes
 type volume struct {
 	Path  string `json:"path"`
@@ -171,8 +200,8 @@ type diskInfo struct {
 	Health   bool   `json:"health"`
 	Standby  bool   `json:"standby"`
 	Hours    int    `json:"power_on_hours"`
-	Realloc  int    `json:"reallocated"`
-	Pending  int    `json:"pending"`
+	Realloc  int64  `json:"reallocated"`
+	Pending  int64  `json:"pending"`
 	Rotation string `json:"rotation"`
 }
 
@@ -229,7 +258,7 @@ func readDisks() []diskInfo {
 				Table []struct {
 					ID  int `json:"id"`
 					Raw struct {
-						Value int `json:"value"`
+						Value int64 `json:"value"` // int64: Seagate raw values exceed 32 bits (ARMv5 int)
 					} `json:"raw"`
 				} `json:"table"`
 			} `json:"ata_smart_attributes"`
@@ -245,7 +274,7 @@ func readDisks() []diskInfo {
 				d.Health = sm.SmartStatus.Passed
 			}
 			if sm.RotationRate > 0 {
-				d.Rotation = strconv.Itoa(sm.RotationRate) + " U/min"
+				d.Rotation = strconv.Itoa(sm.RotationRate) + " rpm"
 			}
 			for _, a := range sm.Ata.Table {
 				switch a.ID {
@@ -342,7 +371,7 @@ func registerSys(mux *http.ServeMux, s *storeT) {
 	}()
 	// live values (polled every 3 s)
 	mux.HandleFunc("GET /api/stats", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
-		ok(w, map[string]any{"cpu": cpuPrev.percent, "mem": memInfo(), "net": netStats(), "load": loadAvg(), "uptime": uptimeSeconds(), "time": time.Now().Unix()})
+		ok(w, map[string]any{"cpu": cpuPrev.percent, "mem": memInfo(), "net": netStats(), "io": diskIOStats(), "load": loadAvg(), "uptime": uptimeSeconds(), "time": time.Now().Unix()})
 	}))
 	mux.HandleFunc("GET /api/overview", s.auth(func(w http.ResponseWriter, r *http.Request, u *user) {
 		kern, _ := os.ReadFile("/proc/sys/kernel/osrelease")
