@@ -13,3 +13,21 @@ func TestParseDiskstats(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestSsoAllowed(t *testing.T) {
+	cases := []struct {
+		ip, list string
+		want     bool
+	}{
+		{"10.40.32.69", "10.40.32.69", true},
+		{"10.40.32.69", " 127.0.0.1 , 10.40.32.69", true},
+		{"10.40.32.70", "10.40.32.69", false},
+		{"10.40.32.69", "", false},
+		{"[::1]", "::1", true},
+	}
+	for _, c := range cases {
+		if got := ssoAllowed(c.ip, c.list); got != c.want {
+			t.Errorf("ssoAllowed(%q, %q) = %v, want %v", c.ip, c.list, got, c.want)
+		}
+	}
+}

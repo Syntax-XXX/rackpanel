@@ -878,4 +878,12 @@ function loginView() {
 }
 function logout() { tok = null; store.set('rp.tok', null); if (cleanup) { cleanup(); cleanup = null; } loginView(); }
 
-tok ? shell() : loginView();
+// behind the Keycloak SSO proxy the panel signs in by itself (POST /api/sso answers 401 everywhere else)
+async function trySso() {
+  try {
+    const r = await fetch('/api/sso', { method: 'POST' });
+    if (r.ok) { const d = (await r.json()).data; tok = d.token; store.set('rp.tok', JSON.stringify(tok)); store.set('rp.user', d.user.username); return shell(); }
+  } catch { /* no SSO */ }
+  loginView();
+}
+tok ? shell() : trySso();

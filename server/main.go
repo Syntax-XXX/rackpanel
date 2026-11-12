@@ -24,6 +24,9 @@ var (
 	roots   = flag.String("roots", "", "folders for the file manager, comma separated (empty = detect)")
 	setUser = flag.String("set-user", "", "create panel user / set password (password on stdin) and exit")
 	showVer = flag.Bool("version", false, "print the version")
+	ssoProxy = flag.String("sso-proxy", "", "reverse proxies (IPs, comma separated) that already signed the user in (e.g. oauth2-proxy/Keycloak); a request from there carrying -sso-header gets a panel session. Empty = off")
+	ssoHead  = flag.String("sso-header", "X-Auth-Request-Preferred-Username", "header the SSO proxy sets to the signed-in user name")
+	ssoUser  = flag.String("sso-user", "admin", "panel user an SSO sign-in is mapped to")
 )
 
 type result struct {

@@ -237,6 +237,17 @@ func noteFail(ip string) {
 	loginFails.Unlock()
 }
 
+// ssoAllowed: ip is one of the configured SSO proxies (comma separated list, empty = SSO off)
+func ssoAllowed(ip, list string) bool {
+	ip = strings.Trim(ip, "[]")
+	for _, p := range strings.Split(list, ",") {
+		if p = strings.TrimSpace(p); p != "" && p == ip {
+			return true
+		}
+	}
+	return false
+}
+
 func clientIP(r *http.Request) string {
 	h := r.RemoteAddr
 	if i := strings.LastIndex(h, ":"); i > 0 {
@@ -290,6 +301,26 @@ func registerUsers(mux *http.ServeMux, s *storeT) {
 		if u == nil || bcrypt.CompareHashAndPassword([]byte(cp.Hash), []byte(in["password"])) != nil {
 			noteFail(ip)
 			fail(w, 401, 401, "wrong username or password")
+			return
+		}
+		ok(w, map[string]any{"token": s.tokens(&cp), "user": cp.public()})
+	})
+	// SSO: the reverse proxy in front (Caddy + oauth2-proxy) has already checked Keycloak – trust only its direct
+	// connection, never X-Forwarded-For, so nobody else on the LAN can forge the header.
+	mux.HandleFunc("POST /api/sso", func(w http.ResponseWriter, r *http.Request) {
+		if !ssoAllowed(clientIP(r), *ssoProxy) || strings.TrimSpace(r.Header.Get(*ssoHead)) == "" {
+			fail(w, http.StatusUnauthorized, 401, "no SSO")
+			return
+		}
+		s.mu.Lock()
+		u := s.userByName(*ssoUser)
+		var cp user
+		if u != nil {
+			cp = *u
+		}
+		s.mu.Unlock()
+		if u == nil {
+			fail(w, http.StatusUnauthorized, 401, "SSO user not found")
 			return
 		}
 		ok(w, map[string]any{"token": s.tokens(&cp), "user": cp.public()})
