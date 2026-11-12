@@ -338,6 +338,12 @@ func fanInfo() map[string]any {
 			out["rpm"], out["pwm"], out["max"] = rd("fan1_input"), rd("pwm1"), rd("fan1_max")
 		}
 	}
+	// gpio-fan only reports the set level as rpm; rs812-panel measures the real speed from the tach pulses
+	if b, err := os.ReadFile("/run/rs812/fan_rpm"); err == nil {
+		if v, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil {
+			out["rpm"], out["measured"] = v, true
+		}
+	}
 	return out
 }
 
