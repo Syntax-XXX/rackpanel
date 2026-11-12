@@ -46,3 +46,11 @@ func TestParseRef(t *testing.T) {
 		t.Error("accepted invalid ref")
 	}
 }
+
+func TestStopSignal(t *testing.T) {
+	for in, want := range map[string]string{"": "SIGTERM", "SIGQUIT": "SIGQUIT", "quit": "SIGQUIT", "SIGINT": "SIGINT", "15": "SIGTERM", "SIGRTMIN+3": "SIGTERM", "X; rm": "SIGTERM"} {
+		if got := stopSignal(in); got != want {
+			t.Errorf("stopSignal(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

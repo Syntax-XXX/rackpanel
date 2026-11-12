@@ -28,6 +28,7 @@ type imageConfig struct {
 		Cmd        []string `json:"Cmd"`
 		WorkingDir string   `json:"WorkingDir"`
 		User       string   `json:"User"`
+		StopSignal string   `json:"StopSignal"`
 	} `json:"config"`
 }
 
@@ -238,7 +239,7 @@ func writeUnit(c container) error {
 	ref, _ := parseRef(c.Image)
 	var ic imageConfig
 	_ = readJSON(filepath.Join(imageDir(ref), "config.json"), &ic)
-	args := []string{"/usr/bin/systemd-nspawn", "--quiet", "--keep-unit", "--register=no", "--as-pid2", "--link-journal=no",
+	args := []string{"/usr/bin/systemd-nspawn", "--quiet", "--keep-unit", "--register=no", "--link-journal=no",
 		"--resolv-conf=copy-host", "--timezone=copy", "--machine=" + c.Name, "-D", filepath.Join(ctDir(c.Name), "rootfs")}
 	env := map[string]string{}
 	for _, e := range ic.Config.Env {
@@ -257,6 +258,9 @@ func writeUnit(c container) error {
 	for _, k := range keys {
 		args = append(args, "--setenv="+k+"="+env[k])
 	}
+	// the app is PID 1 (like Docker without --init) and gets the image's STOPSIGNAL; with --as-pid2 nspawn's
+	// stub init was SIGKILLed on every stop, so each clean stop ended as "failed"
+	args = append(args, "--kill-signal="+stopSignal(ic.Config.StopSignal))
 	for _, b := range c.Binds {
 		if strings.HasSuffix(b, ":ro") {
 			args = append(args, "--bind-ro="+strings.TrimSuffix(b, ":ro"))
@@ -297,6 +301,7 @@ RequiresMountsFor=%s
 [Service]
 ExecStart=%s
 KillMode=mixed
+TimeoutStopSec=15
 Restart=on-failure
 RestartSec=5
 %s
@@ -307,6 +312,20 @@ WantedBy=multi-user.target
 		return err
 	}
 	return exec.Command("systemctl", "daemon-reload").Run()
+}
+
+var sigRe = regexp.MustCompile(`^SIG[A-Z]{2,8}$`)
+
+// stopSignal: the image's STOPSIGNAL ("SIGQUIT", "quit") for nspawn; numeric or odd values fall back to SIGTERM
+func stopSignal(s string) string {
+	s = strings.ToUpper(s)
+	if s != "" && !strings.HasPrefix(s, "SIG") {
+		s = "SIG" + s
+	}
+	if !sigRe.MatchString(s) {
+		return "SIGTERM"
+	}
+	return s
 }
 
 func systemctl(args ...string) error {
